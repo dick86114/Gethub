@@ -17,4 +17,6 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
