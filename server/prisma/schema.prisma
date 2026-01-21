@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id       Int      @id @default(autoincrement())
+  username String   @unique
+  password String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Config {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Repo {
+  id          Int      @id @default(autoincrement())
+  githubId    Int      @unique
+  fullName    String
+  name        String
+  description String?
+  htmlUrl     String
+  language    String?
+  stars       Int
+  forks       Int
+  topics      String[]
+  ownerAvatar String?
+  ownerLogin  String?
+  defaultBranch String?
+
+  // AI Analysis
+  summary     String?  // JSON string containing coreSummary, features, useCases
+  readme      String?  // Original README HTML
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
