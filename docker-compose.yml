@@ -17,9 +17,12 @@ services:
       timeout: 5s
       retries: 5
 
-  server:
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-dick86114}/gethub-server:latest
-    container_name: gethub-server
+  gethub:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-dick86114}/gethub:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gethub
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-gethub}:${DB_PASSWORD:-gethub_pass}@db:5432/${DB_NAME:-gethub}?schema=public
@@ -31,16 +34,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${SERVER_PORT:-3000}:3000"
-
-  client:
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-dick86114}/gethub-client:latest
-    container_name: gethub-client
-    restart: unless-stopped
-    ports:
-      - "${CLIENT_PORT:-8080}:80"
-    depends_on:
-      - server
+      - "${PORT:-3000}:3000"
 
 volumes:
   postgres_data:

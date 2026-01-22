@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import apiRoutes from './routes/api';
 import { AuthController } from './controllers/authController';
 import { SchedulerService } from './services/scheduler';
@@ -17,6 +18,14 @@ app.use('/api', apiRoutes);
 
 app.get('/health', (req, res) => {
   res.send('OK');
+});
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Handle SPA fallback
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 const start = async () => {

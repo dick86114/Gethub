@@ -45,8 +45,9 @@ export class RepoController {
     const where: any = {};
     if (search) {
         where.OR = [
-            { fullName: { contains: search } },
-            { description: { contains: search } }
+            { fullName: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+            { summary: { contains: search, mode: 'insensitive' } }
         ];
     }
 
