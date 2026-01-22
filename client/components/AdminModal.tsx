@@ -122,6 +122,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [totalRepos, setTotalRepos] = useState(0);
   const [repoPage, setRepoPage] = useState(1);
   const repoPageRef = useRef(repoPage);
+  const [selectedRepoIds, setSelectedRepoIds] = useState<number[]>([]);
 
   useEffect(() => {
     repoPageRef.current = repoPage;
@@ -189,6 +190,46 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
           }
       });
   };
+
+  const handleBatchDelete = async () => {
+      if (selectedRepoIds.length === 0) return;
+      setConfirmModal({
+          isOpen: true,
+          title: '批量删除',
+          content: `确定要删除选中的 ${selectedRepoIds.length} 个项目吗？此操作无法撤销。`,
+          onConfirm: async () => {
+              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+              setLoading(true);
+              try {
+                  for (const id of selectedRepoIds) {
+                      await deleteRepo(token!, id);
+                  }
+                  setMsg(`批量删除成功`);
+                  setSelectedRepoIds([]);
+                  refreshRepos();
+              } catch (e: any) {
+                  setMsg(`删除失败: ${e.message}`);
+              } finally {
+                  setLoading(false);
+              }
+          }
+      });
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.checked) {
+          setSelectedRepoIds(repos.map(r => r.id));
+      } else {
+          setSelectedRepoIds([]);
+      }
+  };
+
+  const handleSelectOne = (id: number) => {
+      setSelectedRepoIds(prev => 
+          prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      );
+  };
+
 
   const handleReAnalyze = async (id: number) => {
       try {
@@ -301,51 +342,33 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Helper to refresh list (reset to page 1)
+  // Helper to refresh list (stay on current page)
   const refreshRepos = () => {
-      if (repoPage === 1) {
-          loadRepos();
-      } else {
-          setRepoPage(1);
-      }
+      loadRepos();
   };
 
   const loadRepos = async () => {
       try {
-          const currentPage = repoPageRef.current;
-          // If loading more pages (page > 1), don't show global loading
-          if (currentPage === 1) {
-              // optional: setLoading(true) if we want global spinner for first page
+          // If we deleted everything on the current page and it's not the first page, go back
+          if (repoPage > 1 && repos.length === 0 && totalRepos > 0) {
+              setRepoPage(p => p - 1);
+              return;
           }
+
+          const currentPage = repoPageRef.current;
+          setLoadingMore(true);
           
           const res = await getRepos(currentPage, 10, searchQuery);
           
-          setRepos(prev => {
-              if (currentPage === 1) {
-                  return res.data;
-              } else {
-                  // Append mode: avoid duplicates
-                  const existingIds = new Set(prev.map(r => r.id));
-                  const newItems = res.data.filter(r => !existingIds.has(r.id));
-                  return [...prev, ...newItems];
-              }
-          });
+          setRepos(res.data);
           setTotalRepos(res.total);
+          
+          // Clear selection if items are gone
+          setSelectedRepoIds([]);
       } catch (e) {
           console.error(e);
       } finally {
           setLoadingMore(false);
-      }
-  };
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-      // Threshold 50px
-      if (scrollHeight - scrollTop - clientHeight < 50) {
-          if (!loadingMore && repos.length < totalRepos) {
-              setLoadingMore(true);
-              setRepoPage(p => p + 1);
-          }
       }
   };
 
@@ -586,7 +609,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
                 <div 
                     className="p-6 overflow-y-auto custom-scrollbar flex-1"
-                    onScroll={handleScroll}
                 >
                     {activeTab === 'config' ? (
                         <div className="space-y-6 max-w-2xl mx-auto">
@@ -867,8 +889,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                                 <h3 className="text-white font-bold mb-4 flex justify-between items-center">
                                     <span>已保存项目 ({totalRepos})</span>
                                     <div className="flex gap-2">
-                                        <button onClick={handleCleanup} className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 border border-red-400/20 px-2 py-1 rounded hover:bg-red-400/10 transition-colors">
-                                            <span className="material-symbols-outlined text-[14px]">delete_sweep</span> 清理无效项目
+                                        {selectedRepoIds.length > 0 && (
+                                            <button 
+                                                onClick={handleBatchDelete} 
+                                                className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 border border-red-400/20 px-2 py-1 rounded hover:bg-red-400/10 transition-colors animate-[fadeIn_0.2s]"
+                                            >
+                                                <span className="material-symbols-outlined text-[14px]">delete</span> 
+                                                批量删除 ({selectedRepoIds.length})
+                                            </button>
+                                        )}
+                                        <button onClick={handleCleanup} className="text-slate-400 hover:text-red-300 text-xs flex items-center gap-1 border border-white/10 px-2 py-1 rounded hover:bg-white/5 transition-colors">
+                                            <span className="material-symbols-outlined text-[14px]">delete_sweep</span> 清理无效
                                         </button>
                                         <button onClick={refreshRepos} className="text-slate-500 hover:text-white text-xs flex items-center gap-1 border border-white/10 px-2 py-1 rounded hover:bg-white/5 transition-colors">
                                             <span className="material-symbols-outlined text-[14px]">refresh</span> 刷新
@@ -894,6 +925,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                                     <table className="w-full text-left text-sm">
                                         <thead className="bg-white/5 text-slate-400">
                                             <tr>
+                                                <th className="p-3 font-medium w-10">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={repos.length > 0 && repos.every(r => selectedRepoIds.includes(r.id))}
+                                                        onChange={handleSelectAll}
+                                                        className="rounded bg-white/10 border-white/20 text-primary focus:ring-0 focus:ring-offset-0 w-4 h-4 accent-primary"
+                                                    />
+                                                </th>
                                                 <th className="p-3 font-medium">项目名称</th>
                                                 <th className="p-3 font-medium">Stars</th>
                                                 <th className="p-3 font-medium">AI 分析</th>
@@ -903,7 +942,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                                         </thead>
                                         <tbody className="divide-y divide-white/5">
                                             {repos.map(repo => (
-                                                <tr key={repo.id} className="hover:bg-white/5 transition-colors">
+                                                <tr key={repo.id} className={`hover:bg-white/5 transition-colors ${selectedRepoIds.includes(repo.id) ? 'bg-white/5' : ''}`}>
+                                                    <td className="p-3">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={selectedRepoIds.includes(repo.id)}
+                                                            onChange={() => handleSelectOne(repo.id)}
+                                                            className="rounded bg-white/10 border-white/20 text-primary focus:ring-0 focus:ring-offset-0 w-4 h-4 accent-primary"
+                                                        />
+                                                    </td>
                                                     <td className="p-3 text-white">
                                                         <a href={repo.htmlUrl} target="_blank" className="hover:text-primary flex items-center gap-2">
                                                             <img src={repo.ownerAvatar} className="w-5 h-5 rounded-full" />
@@ -957,8 +1004,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                                             ))}
                                             {repos.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={5} className="p-8 text-center text-slate-500">
-                                                        暂无数据
+                                                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                                                        {loadingMore ? '加载中...' : '暂无数据'}
                                                     </td>
                                                 </tr>
                                             )}
@@ -966,11 +1013,32 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                                     </table>
                                 </div>
                                 
-                                {loadingMore && (
-                                    <div className="flex justify-center items-center p-4">
-                                        <div className="flex items-center gap-2 text-slate-500 text-sm">
-                                            <span className="material-symbols-outlined animate-spin text-lg">sync</span>
-                                            加载更多...
+                                {/* Pagination Footer */}
+                                {totalRepos > 0 && (
+                                    <div className="flex justify-between items-center mt-4 px-2 animate-[fadeIn_0.3s]">
+                                        <div className="text-sm text-slate-500">
+                                            显示 {(repoPage - 1) * 10 + 1} - {Math.min(repoPage * 10, totalRepos)} 共 {totalRepos} 条
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                disabled={repoPage === 1 || loadingMore} 
+                                                onClick={() => setRepoPage(p => Math.max(1, p - 1))}
+                                                className="px-3 py-1.5 rounded border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors flex items-center gap-1"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">chevron_left</span>
+                                                上一页
+                                            </button>
+                                            <span className="text-slate-300 text-sm px-2 bg-white/5 rounded py-1">
+                                                第 <span className="text-primary font-bold">{repoPage}</span> 页
+                                            </span>
+                                            <button 
+                                                disabled={repoPage * 10 >= totalRepos || loadingMore} 
+                                                onClick={() => setRepoPage(p => p + 1)}
+                                                className="px-3 py-1.5 rounded border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors flex items-center gap-1"
+                                            >
+                                                下一页
+                                                <span className="material-symbols-outlined text-sm">chevron_right</span>
+                                            </button>
                                         </div>
                                     </div>
                                 )}
