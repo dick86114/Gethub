@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  server:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-dick86114}/gethub-server:latest
+    container_name: gethub-server
+    restart: unless-stopped
+    environment:
+      # 请将下面的链接替换为你的远程数据库连接字符串
+      # 格式: postgresql://USER:PASSWORD@HOST:PORT/DB_NAME?schema=public
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_please_change_it}
+      - PORT=3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+
+  client:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-dick86114}/gethub-client:latest
+    container_name: gethub-client
+    restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-8080}:80"
+    depends_on:
+      - server

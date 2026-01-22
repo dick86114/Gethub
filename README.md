@@ -9,6 +9,32 @@
   [![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=flat&logo=Prisma&logoColor=white)](https://www.prisma.io/)
 </div>
 
+## 效果图
+![alt text](image.png)
+![alt text](image-1.png)
+
+---
+
+## 📅 v2.0 更新日志 (2026-01-22)
+
+Gethub 2.0 正式发布！本次大版本更新带来了全新的 UI 风格、更完善的移动端体验以及企业级的部署支持。
+
+### ✨ 核心更新
+- **🎨 UI 风格全面统一**：
+  - 移除了浅色模式，全站强制采用沉浸式暗色主题。
+  - 登录页与确认弹窗升级为 Glassmorphism（暗色玻璃拟态）风格，视觉体验高度一致。
+  - 新增统一的 `ConfirmModal` 组件，替换了原生的系统确认框，交互更加优雅。
+- **📱 移动端深度优化**：
+  - 顶部搜索框在移动端优化为折叠式图标，释放宝贵的屏幕空间。
+  - 详情页 "AI深度分析" 按钮图标化，布局更加紧凑。
+- **⚙️ 功能增强**：
+  - 搜索框新增一键清空功能。
+  - 优化了无效项目清理逻辑：现在会保留无描述但拥有 README 的项目，防止误删。
+- **🚀 部署与运维**：
+  - **CI/CD 集成**：新增 GitHub Actions 工作流，支持自动构建 Docker 镜像并发布到 GHCR 和 Docker Hub。
+  - **灵活部署**：支持连接远程数据库部署模式，满足多样化架构需求。
+  - **数据库保障**：新增启动时自动迁移与初始化脚本，防止因数据库未初始化导致的服务不可用。
+
 ---
 
 ## 📅 v1.0 更新日志 (2026-01-22)
@@ -68,42 +94,77 @@
 - **数据库**：PostgreSQL, Prisma ORM
 - **部署**：Docker, Docker Compose, Nginx
 
-## 🚀 快速开始
+## 🚀 部署指南
 
-### 前置要求
-- [Docker](https://www.docker.com/) & Docker Compose
-- Node.js (仅用于本地开发)
+我们提供了多种部署方式，你可以根据实际需求选择最适合的一种。
 
-### 部署步骤
+### 方式一：Docker Compose 一键部署（推荐）
 
-1. **克隆仓库**
-   ```bash
-   git clone https://github.com/dick86114/Gethub.git
-   cd Gethub
-   ```
+最简单的部署方式，内置 PostgreSQL 数据库，开箱即用。
+
+1. **下载配置文件**
+   下载项目中的 `docker-compose.yml` 文件。
 
 2. **配置环境变量**
-   复制示例配置文件并填入你的实际配置：
-   ```bash
-   cp .env.example .env
-   ```
-   编辑 `.env` 文件，设置数据库连接和 JWT 密钥：
+   创建一个 `.env` 文件（可参考 `.env.example`），配置必要的参数：
    ```env
-   DATABASE_URL=postgresql://user:password@host:5432/gethub
-   JWT_SECRET=your-secure-secret-key
+   # 项目配置
+   GITHUB_REPOSITORY_OWNER=dick86114  # 镜像拉取源
+   
+   # 数据库配置（内置数据库会自动使用这些凭据）
+   DB_USER=gethub
+   DB_PASSWORD=gethub_pass
+   DB_NAME=gethub
+   
+   # 安全配置
+   JWT_SECRET=please_change_this_to_a_random_secret_string
+   
+   # 端口配置
+   SERVER_PORT=3000
+   CLIENT_PORT=8080
    ```
 
 3. **启动服务**
-   使用 Docker Compose 一键启动：
    ```bash
-   docker compose up -d --build
+   docker compose up -d
    ```
 
-4. **访问应用**
-   - 前端页面：`http://localhost:8080`
-   - 后端 API：`http://localhost:3000`
+### 方式二：连接远程数据库部署
 
-## ⚙️ 开发指南
+如果你已经有现成的 PostgreSQL 数据库服务（如云数据库或独立的数据库服务器），可以使用此方式。
+
+1. **下载配置文件**
+   下载项目中的 `docker-compose-remote.yml` 文件。
+
+2. **配置环境变量**
+   配置 `.env` 文件，重点是 `DATABASE_URL`：
+   ```env
+   # 远程数据库连接字符串
+   # 格式: postgresql://USER:PASSWORD@HOST:PORT/DB_NAME?schema=public
+   DATABASE_URL=postgresql://admin:password@192.168.1.100:5432/gethub?schema=public
+   
+   # 其他配置
+   GITHUB_REPOSITORY_OWNER=dick86114
+   JWT_SECRET=your_secure_secret
+   SERVER_PORT=3000
+   CLIENT_PORT=8080
+   ```
+
+3. **启动服务**
+   使用 `-f` 参数指定配置文件启动：
+   ```bash
+   docker compose -f docker-compose-remote.yml up -d
+   ```
+
+### 验证部署
+
+部署完成后，访问以下地址：
+- **前端页面**：`http://localhost:8080` (或你配置的 `CLIENT_PORT`)
+- **后台管理**：点击页面右上角的设置图标，默认账户 `admin` / `admin123`
+
+---
+
+## ⚙️ 本地开发指南
 
 如果你想在本地运行源码进行开发：
 
