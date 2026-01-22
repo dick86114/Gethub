@@ -39,33 +39,97 @@ export class RepoController {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = req.query.search as string || '';
+    const sort = req.query.sort as string || 'newest';
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (search) {
         where.OR = [
-            { fullName: { contains: search } }, // Case sensitive in SQLite/MySQL usually, but Prisma handles it well
+            { fullName: { contains: search } },
             { description: { contains: search } }
         ];
     }
 
-    const [repos, total] = await Promise.all([
-      prisma.repo.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' }, 
-      }),
-      prisma.repo.count({ where }),
-    ]);
+    try {
+        let repos: any[];
+        let total: number;
 
-    // Parse summary JSON
-    const parsedRepos = repos.map(r => ({
-      ...r,
-      summary: r.summary ? JSON.parse(r.summary) : null
-    }));
+        if (sort === 'random') {
+             // For random sort, we use raw query for better randomization
+             // Note: This works for PostgreSQL. For MySQL use RAND(). For SQLite use RANDOM().
+             // Since we use Postgres (from schema), RANDOM() is correct.
+             if (search) {
+                // If search is active, random sort within search results
+                // This is complex with raw query, so we fallback to Prisma findMany with client-side shuffle?
+                // Or just ignore random sort when searching (usually search results are relevance or date sorted)
+                // Let's keep it simple: if search, ignore random.
+                const [results, count] = await Promise.all([
+                    prisma.repo.findMany({
+                        where,
+                        take: limit,
+                        skip: skip, // Standard pagination for search
+                        orderBy: { createdAt: 'desc' },
+                    }),
+                    prisma.repo.count({ where }),
+                ]);
+                repos = results;
+                total = count;
+             } else {
+                 // Pure random discovery mode
+                 // We use raw query. Note: "Repo" table name is case-sensitive in Postgres if quoted.
+                 // Prisma usually maps model Repo to table "Repo" or "repo". 
+                 // We try "Repo" first.
+                 const totalCount = await prisma.repo.count();
+                 total = totalCount;
+                 
+                 repos = await prisma.$queryRaw`
+                    SELECT * FROM "Repo" 
+                    ORDER BY RANDOM() 
+                    LIMIT ${limit} 
+                    OFFSET ${skip}
+                 `;
+             }
+        } else {
+            // Default newest
+            const [results, count] = await Promise.all([
+                prisma.repo.findMany({
+                    where,
+                    skip,
+                    take: limit,
+                    orderBy: { createdAt: 'desc' }, 
+                }),
+                prisma.repo.count({ where }),
+            ]);
+            repos = results;
+            total = count;
+        }
 
-    res.json({ data: parsedRepos, total, page, limit });
+        // Parse summary JSON
+        const parsedRepos = repos.map(r => ({
+            ...r,
+            summary: r.summary ? (typeof r.summary === 'string' ? JSON.parse(r.summary) : r.summary) : null,
+            // Ensure other fields match expected types if raw query returns different types (e.g. dates)
+        }));
+
+        res.json({ data: parsedRepos, total, page, limit });
+    } catch (e: any) {
+        console.error("List error:", e);
+        // Fallback to standard list if raw query fails
+        const [fallbackRepos, count] = await Promise.all([
+             prisma.repo.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+             }),
+             prisma.repo.count({ where }),
+        ]);
+        const parsed = fallbackRepos.map(r => ({
+             ...r,
+             summary: r.summary ? JSON.parse(r.summary) : null
+        }));
+        res.json({ data: parsed, total: count, page, limit });
+    }
   }
 
   static async getRandom(req: Request, res: Response) {
@@ -109,9 +173,19 @@ export class RepoController {
     try {
         const result = await prisma.repo.deleteMany({
             where: {
-                OR: [
-                    { description: null },
-                    { description: '' }
+                AND: [
+                    {
+                        OR: [
+                            { description: null },
+                            { description: '' }
+                        ]
+                    },
+                    {
+                        OR: [
+                            { readme: null },
+                            { readme: '' }
+                        ]
+                    }
                 ]
             }
         });

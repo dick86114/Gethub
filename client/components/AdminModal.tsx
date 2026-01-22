@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { login, changePassword, getConfigs, updateConfigs, triggerFetch, getJobStatus, getRepos, testAiConfig, testGithubConfig, addRepo, deleteRepo, reAnalyzeRepo, getRepoDetail, cleanupRepos } from '../services/api';
 import { AppConfig, Repo } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -139,6 +140,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null);
 
+  // Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    content: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', content: '', onConfirm: () => {} });
+
   // Password Change State
   const [changePasswordOld, setChangePasswordOld] = useState('');
   const [changePasswordNew, setChangePasswordNew] = useState('');
@@ -164,14 +173,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleDelete = async (id: number) => {
-      if (!confirm('确定要删除该项目吗？')) return;
-      try {
-          await deleteRepo(token!, id);
-          setMsg('删除成功');
-          refreshRepos();
-      } catch (e: any) {
-          alert(`删除失败: ${e.message}`);
-      }
+      setConfirmModal({
+          isOpen: true,
+          title: '确认删除',
+          content: '确定要删除该项目吗？此操作无法撤销。',
+          onConfirm: async () => {
+              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+              try {
+                  await deleteRepo(token!, id);
+                  setMsg('删除成功');
+                  refreshRepos();
+              } catch (e: any) {
+                  alert(`删除失败: ${e.message}`);
+              }
+          }
+      });
   };
 
   const handleReAnalyze = async (id: number) => {
@@ -186,17 +202,24 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
   const handleCleanup = async () => {
       if (!token) return;
-      if (!confirm('确定要清理所有没有描述的项目吗？这将无法恢复。')) return;
-      setLoading(true);
-      try {
-          const res = await cleanupRepos(token);
-          setMsg(`清理完成，共删除 ${res.count} 个项目`);
-          refreshRepos();
-      } catch (e: any) {
-          setMsg(`清理失败: ${e.message}`);
-      } finally {
-          setLoading(false);
-      }
+      setConfirmModal({
+          isOpen: true,
+          title: '确认清理',
+          content: '确定要清理所有没有描述且没有 Readme 的项目吗？这将无法恢复。',
+          onConfirm: async () => {
+              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+              setLoading(true);
+              try {
+                  const res = await cleanupRepos(token);
+                  setMsg(`清理完成，共删除 ${res.count} 个项目`);
+                  refreshRepos();
+              } catch (e: any) {
+                  setMsg(`清理失败: ${e.message}`);
+              } finally {
+                  setLoading(false);
+              }
+          }
+      });
   };
 
   const handleChangePassword = async () => {
@@ -439,47 +462,105 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s]">
-      <div className="w-full max-w-4xl bg-[#0e1015] border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-[#151922]">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">admin_panel_settings</span>
-            后台管理
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </div>
+      {/* Glow Effect for Login */}
+      {!token && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[360px] h-[400px] bg-gradient-to-r from-primary to-purple-600 rounded-full opacity-20 blur-3xl pointer-events-none"></div>
+      )}
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`relative flex flex-col transition-all duration-300 ${
+        token 
+          ? 'w-full max-w-5xl h-[85vh] bg-[#0e1015] border border-white/10 rounded-xl shadow-2xl overflow-hidden' 
+          : 'w-full max-w-[380px] glass-panel rounded-2xl shadow-2xl p-8'
+      }`}>
+        
+        {/* Close Button for Login State */}
+        {!token && (
+            <button 
+                onClick={onClose} 
+                className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors p-1"
+            >
+                <span className="material-symbols-outlined">close</span>
+            </button>
+        )}
+
+        {/* Admin Header - Only show when logged in */}
+        {token && (
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-[#151922]">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">admin_panel_settings</span>
+                后台管理
+              </h2>
+              <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+        )}
+
+        <div className={`flex-1 flex flex-col ${token ? 'overflow-hidden' : ''}`}>
           {!token ? (
-            <div className="p-12 flex justify-center items-center">
-                 <div className="w-full max-w-sm space-y-4">
-                    <h3 className="text-center text-white font-bold text-xl mb-6">管理员登录</h3>
-                    <input
-                        type="text"
-                        placeholder="用户名"
-                        value={username}
-                        onChange={e => setUsername(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                        className="w-full bg-black/20 border border-white/10 rounded p-3 text-white focus:border-primary outline-none transition-colors"
-                    />
-                    <input
-                        type="password"
-                        placeholder="密码"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                        className="w-full bg-black/20 border border-white/10 rounded p-3 text-white focus:border-primary outline-none transition-colors"
-                    />
+            <div className="flex flex-col items-center w-full">
+                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-6 ring-1 ring-white/10">
+                    <span className="material-symbols-outlined text-2xl text-primary">admin_panel_settings</span>
+                </div>
+                
+                <h3 className="text-white font-bold text-xl mb-2">管理员登录</h3>
+                <p className="text-slate-400 text-sm mb-8">请验证您的身份以继续</p>
+                
+                <div className="w-full space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-500 ml-1">用户名</label>
+                        <div className="relative group">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
+                                <span className="material-symbols-outlined text-[20px]">person</span>
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Admin Username"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white text-sm focus:border-primary/50 focus:bg-black/60 outline-none transition-all placeholder:text-slate-600"
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-500 ml-1">密码</label>
+                        <div className="relative group">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
+                                <span className="material-symbols-outlined text-[20px]">lock</span>
+                            </div>
+                            <input
+                                type="password"
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white text-sm focus:border-primary/50 focus:bg-black/60 outline-none transition-all placeholder:text-slate-600"
+                            />
+                        </div>
+                    </div>
+
                     <button
                         onClick={handleLogin}
                         disabled={loading}
-                        className="w-full bg-primary hover:bg-primary-hover text-white p-3 rounded font-bold transition-colors disabled:opacity-50"
+                        className="w-full bg-primary hover:bg-primary-hover text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:scale-100 mt-2"
                     >
-                        {loading ? '登录中...' : '登录'}
+                        {loading ? (
+                            <div className="flex items-center justify-center gap-2">
+                                <span className="material-symbols-outlined animate-spin text-sm">sync</span>
+                                <span>验证中...</span>
+                            </div>
+                        ) : '立即登录'}
                     </button>
-                    {msg && <p className="text-red-400 text-center text-sm">{msg}</p>}
-                 </div>
+                    
+                    {msg && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 animate-[shake_0.5s]">
+                            <span className="material-symbols-outlined text-red-400 text-sm">error</span>
+                            <p className="text-red-400 text-xs">{msg}</p>
+                        </div>
+                    )}
+                </div>
             </div>
           ) : (
             <>
@@ -918,6 +999,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
               </div>
           </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal 
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        content={confirmModal.content}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

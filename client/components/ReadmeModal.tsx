@@ -86,22 +86,17 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({ isOpen, onClose, repo 
             <button
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || !repo.readme}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                title={showAnalysis ? "隐藏 AI 分析" : "AI 深度分析"}
+                className={`p-2 rounded-lg transition-colors ${
                     showAnalysis 
-                        ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                        : 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
+                        ? 'text-primary bg-primary/10 hover:bg-primary/20' 
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
                 } ${isAnalyzing ? 'opacity-70 cursor-wait' : ''}`}
             >
                 {isAnalyzing ? (
-                    <>
-                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        正在分析...
-                    </>
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : (
-                    <>
-                        <Icon name="auto_awesome" className="text-sm" />
-                        {showAnalysis ? '隐藏分析' : 'AI 深度分析'}
-                    </>
+                    <Icon name="auto_awesome" className="text-[20px]" />
                 )}
             </button>
             <a 

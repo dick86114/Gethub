@@ -70,11 +70,12 @@ export const getJobStatus = async (token: string) => {
   return res.json();
 };
 
-export const getRepos = async (page = 1, limit = 10, search = '') => {
+export const getRepos = async (page = 1, limit = 10, search = '', sort = 'newest') => {
   const query = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      search
+      search,
+      sort
   });
   const res = await fetch(`${API_BASE}/repos?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch repos');

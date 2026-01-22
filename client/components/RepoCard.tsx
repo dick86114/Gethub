@@ -24,13 +24,22 @@ export const RepoCard = React.memo<RepoCardProps>(({ repo, analysis, loading, on
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
             <div className="flex items-start gap-5">
                 {/* Avatar */}
-                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 p-1 shrink-0 overflow-hidden">
-                    <img 
-                        src={repo.ownerAvatar} 
-                        alt={repo.ownerLogin}
-                        loading="lazy"
-                        className="w-full h-full rounded-xl object-cover" 
-                    />
+                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 p-1 shrink-0 overflow-hidden group/avatar relative z-20">
+                    <a 
+                        href={`https://github.com/${repo.ownerLogin}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="block w-full h-full"
+                        title={`Visit ${repo.ownerLogin} on GitHub`}
+                    >
+                        <img 
+                            src={repo.ownerAvatar} 
+                            alt={repo.ownerLogin}
+                            loading="lazy"
+                            className="w-full h-full rounded-xl object-cover transition-transform duration-300 group-hover/avatar:scale-110" 
+                        />
+                    </a>
                 </div>
                 <div>
                     <p className="font-mono text-sm font-medium text-primary uppercase tracking-widest mb-1 opacity-80">

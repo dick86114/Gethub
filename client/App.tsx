@@ -20,6 +20,10 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // New States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sort, setSort] = useState<'newest' | 'random'>('random');
+
   // Swipe State
   const [touchStartX, setTouchStartX] = useState(0);
   const [touchStartY, setTouchStartY] = useState(0);
@@ -30,13 +34,13 @@ const App = () => {
   const rafRef = useRef<number>();
 
   // Load Repos
-  const loadRepos = useCallback(async (pageNum: number, isInitial = false) => {
+  const loadRepos = useCallback(async (pageNum: number, isInitial: boolean, search: string, sortType: string) => {
     if (loading) return;
     setLoading(true);
     setError(null);
     
     try {
-      const res = await getRepos(pageNum, 10);
+      const res = await getRepos(pageNum, 10, search, sortType);
       if (res.data && res.data.length > 0) {
           if (isInitial) {
               setRepos(res.data);
@@ -46,7 +50,10 @@ const App = () => {
           setHasMore(res.data.length === 10);
       } else {
           setHasMore(false);
-          if (isInitial) setError("暂无数据，请进入后台拉取数据");
+          if (isInitial) {
+              if (search) setError("未找到相关项目");
+              else setError("暂无数据，请进入后台拉取数据");
+          }
       }
     } catch (err: any) {
       setError("连接服务器失败");
@@ -55,21 +62,29 @@ const App = () => {
     }
   }, [loading]);
 
-  // Initial Load
+  // Debounced Search & Sort Effect
   useEffect(() => {
-    loadRepos(1, true);
-  }, []);
+    const timer = setTimeout(() => {
+        // Reset state
+        setRepos([]);
+        setPage(1);
+        setCurrentIndex(0);
+        setHasMore(true);
+        loadRepos(1, true, searchQuery, sort);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, sort]); // Intentionally omitting loadRepos to avoid loops
 
   // Load more when reaching end
   useEffect(() => {
     if (repos.length > 0 && currentIndex >= repos.length - 2 && hasMore && !loading) {
         setPage(p => {
             const nextPage = p + 1;
-            loadRepos(nextPage);
+            loadRepos(nextPage, false, searchQuery, sort);
             return nextPage;
         });
     }
-  }, [currentIndex, repos.length, hasMore, loading, loadRepos]);
+  }, [currentIndex, repos.length, hasMore, loading, loadRepos, searchQuery, sort]);
 
   const handleNext = useCallback(() => {
     if (repos.length === 0) return;
@@ -84,9 +99,25 @@ const App = () => {
   const handleViewDetails = useCallback(() => setIsReadmeOpen(true), []);
   const handleOpenAdmin = useCallback(() => setIsAdminOpen(true), []);
 
+  const handleRefresh = useCallback(() => {
+    setRepos([]);
+    setPage(1);
+    setCurrentIndex(0);
+    setHasMore(true);
+    loadRepos(1, true, searchQuery, sort);
+  }, [searchQuery, sort, loadRepos]);
+
+  const handleShuffle = useCallback(() => {
+    setSearchQuery('');
+    setSort('random');
+  }, []);
+
   // Keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable shortcuts when typing in search input
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
       if (e.code === 'Space' && !isReadmeOpen && !isAdminOpen) {
         e.preventDefault();
         handleNext();
@@ -247,7 +278,7 @@ const App = () => {
               // If dragging left (next comes in), move towards 0, scale up
               if (dragPercent < 0) {
                   translateX = GAP + dragPercent;
-                   // Lerp scale from 0.5 to 1
+                  // Lerp scale from 0.5 to 1
                   scale = 0.5 + (Math.abs(dragPercent)/100) * 0.5;
                   opacity = 0.5 + (Math.abs(dragPercent)/100) * 0.5;
               } else {
@@ -256,41 +287,24 @@ const App = () => {
           }
       }
 
-      // Important: Use 'relative' for the active card so it takes up space in the document flow,
-      // allowing the page to scroll if the card is tall.
-      // Use 'absolute' for others so they stack behind/beside without affecting layout height.
       const isCurrent = position === 0;
       
       const style: React.CSSProperties = {
-          position: isCurrent ? 'relative' : 'absolute',
-          top: isCurrent ? 'auto' : 0,
-          left: isCurrent ? 'auto' : 0, // 'auto' allows flex centering to work if relative
-          width: '100%',
-          // height: isCurrent ? 'auto' : '100%', // Allow current to grow
-          // Actually, if we use 'absolute', top/left 0 is relative to container.
-          // If we use 'relative', it sits in the flex container.
+          // Use Grid layout instead of absolute/relative swap
+          gridArea: '1 / 1',
           
-          // But wait, if we mix relative and absolute, the absolute ones are relative to the parent.
-          // If parent height is determined by the 'relative' child, then 'absolute' children with h-100% will match that height.
-          // This is perfect.
-          
-          willChange: 'transform',
-          transition: isSwiping ? 'none' : 'all 0.3s ease-out',
+          willChange: 'transform, opacity',
+          // Optimize transition: avoid 'all', use specific properties and easing
+          transition: isSwiping ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)',
           zIndex: zIndex,
           opacity: opacity,
           transform: `translateX(${translateX}%) scale(${scale})`,
           transformOrigin: 'center center',
           pointerEvents: isCurrent ? 'auto' : 'none', // Only current is interactive
       };
-      
-      // Special handling for absolute positioning centering
-      if (!isCurrent) {
-          style.top = 0;
-          style.left = 0;
-      }
 
       return (
-          <div key={repo.id} style={style} className={`w-full flex items-center justify-center p-4 ${!isCurrent ? 'h-full' : 'my-auto'}`}>
+          <div key={repo.id} style={style} className="w-full flex items-center justify-center p-4">
               <div className="w-full max-w-[900px]">
                   <RepoCard 
                       repo={repo} 
@@ -309,11 +323,17 @@ const App = () => {
       {/* Background Mesh */}
       <div className="fixed inset-0 pointer-events-none z-0 mesh-bg opacity-60"></div>
       
+      {/* Navbar */}
+      <Navbar 
+        onOpenAdmin={handleOpenAdmin} 
+        onRefresh={handleRefresh}
+        onShuffle={handleShuffle}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+      />
+
       {/* Main Content */}
       <main className="flex-1 relative z-10 w-full flex flex-col items-center min-h-0"> 
-        {/* min-h-0 is important for nested flex scroll, but here we want main to grow and be scrollable if needed. 
-            Actually, we removed overflow-hidden, so document body will scroll. 
-            The main just takes space. */}
         
         {loading && repos.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-slate-500 gap-4 h-[50vh]">
@@ -324,12 +344,12 @@ const App = () => {
             <div className="flex flex-col items-center justify-center text-red-400 gap-4 h-[50vh]">
                 <Icon name="error" className="text-4xl" />
                 <p>{error}</p>
-                <button onClick={() => loadRepos(1, true)} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">重试</button>
+                <button onClick={handleRefresh} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">重试</button>
             </div>
         ) : (
             <div 
                 ref={containerRef}
-                className="flex-1 flex items-center justify-center relative w-full max-w-[1400px] mx-auto perspective-1000 touch-pan-y"
+                className="flex-1 grid place-items-center relative w-full max-w-[1400px] mx-auto perspective-1000 touch-pan-y"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -359,9 +379,6 @@ const App = () => {
         )}
 
       </main>
-
-      {/* Navbar */}
-      <Navbar onOpenAdmin={handleOpenAdmin} />
 
       {/* Modals */}
       <AdminModal 
