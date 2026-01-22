@@ -374,7 +374,18 @@ const App = () => {
                     </button>
                 </div>
 
-                {repos.map((repo, index) => renderCard(repo, index))}
+                {(() => {
+                    const N = repos.length;
+                    if (N === 0) return null;
+                    
+                    const indices = new Set<number>();
+                    // Only render visible range (-2 to +2)
+                    for (let i = -2; i <= 2; i++) {
+                        indices.add(((currentIndex + i) % N + N) % N);
+                    }
+                    
+                    return Array.from(indices).map(index => renderCard(repos[index], index));
+                })()}
             </div>
         )}
 

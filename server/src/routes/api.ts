@@ -18,7 +18,6 @@ router.post('/config/test-github', authenticate, ConfigController.testGithub);
 
 // Repos
 router.get('/repos', RepoController.list);
-router.get('/repos/random', RepoController.getRandom);
 router.post('/repos/fetch', authenticate, RepoController.triggerFetch);
 router.post('/repos/add', authenticate, RepoController.addManual);
 router.get('/repos/job-status', authenticate, RepoController.getJobStatus);

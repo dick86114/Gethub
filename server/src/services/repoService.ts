@@ -34,6 +34,8 @@ export class RepoService {
 
   static async enrichRepo(savedRepo: any, repo: any, force = false) {
     let readmeContent = savedRepo.readme;
+    let shouldUpdate = false;
+    const updateData: any = {};
 
     // 4. Fetch Readme (if missing or forced)
     if (!readmeContent || force) {
@@ -42,12 +44,9 @@ export class RepoService {
             const readmeHtml = await GithubService.fetchReadme(repo.owner.login, repo.name, repo.default_branch || 'main');
             
             if (readmeHtml && !readmeHtml.includes('not found')) {
-                // Save original
-                await prisma.repo.update({
-                    where: { id: savedRepo.id },
-                    data: { readme: readmeHtml }
-                });
+                updateData.readme = readmeHtml;
                 readmeContent = readmeHtml;
+                shouldUpdate = true;
             }
         } catch (e) {
             console.error(`Readme processing failed for ${repo.full_name}:`, e);
@@ -59,13 +58,19 @@ export class RepoService {
         console.log(`Analyzing ${repo.full_name} (force=${force})...`);
         try {
             const analysis = await AiService.analyzeRepo(repo, readmeContent);
-            await prisma.repo.update({
-                where: { id: savedRepo.id },
-                data: { summary: JSON.stringify(analysis) }
-            });
+            updateData.summary = JSON.stringify(analysis);
+            shouldUpdate = true;
         } catch (e) {
             console.error(`AI Analysis failed for ${repo.full_name}:`, e);
         }
+    }
+
+    // Batch update if needed
+    if (shouldUpdate) {
+        await prisma.repo.update({
+            where: { id: savedRepo.id },
+            data: updateData
+        });
     }
   }
 

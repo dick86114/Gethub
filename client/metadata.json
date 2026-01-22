@@ -1,5 +1,0 @@
-{
-  "name": "Gethub",
-  "description": "使用 Gemini AI 发现和总结热门 GitHub 项目。",
-  "requestFramePermissions": []
-}

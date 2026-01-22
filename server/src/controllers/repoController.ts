@@ -133,23 +133,6 @@ export class RepoController {
     }
   }
 
-  static async getRandom(req: Request, res: Response) {
-    const count = await prisma.repo.count();
-    if (count === 0) return res.json(null);
-    
-    const skip = Math.floor(Math.random() * count);
-    const repo = await prisma.repo.findFirst({
-      skip,
-    });
-
-    if (repo) {
-        // @ts-ignore
-        repo.summary = repo.summary ? JSON.parse(repo.summary) : null;
-    }
-
-    res.json(repo);
-  }
-
   static async triggerFetch(req: Request, res: Response) {
     // Run in background
     SchedulerService.runJob();

@@ -18,12 +18,6 @@ const handleResponse = async (res: Response, defaultError: string) => {
   return res.json();
 };
 
-export const getRandomRepo = async (): Promise<Repo | null> => {
-  const res = await fetch(`${API_BASE}/repos/random`);
-  if (!res.ok) return null;
-  return res.json();
-};
-
 export const login = async (username: string, password: string): Promise<{ token: string }> => {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
