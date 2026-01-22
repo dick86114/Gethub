@@ -116,12 +116,11 @@ Gethub 2.0 正式发布！本次大版本更新带来了全新的 UI 风格、�
    DB_PASSWORD=gethub_pass
    DB_NAME=gethub
    
-   # 安全配置
-   JWT_SECRET=please_change_this_to_a_random_secret_string
-   
    # 端口配置
-   SERVER_PORT=3000
-   CLIENT_PORT=8080
+   PORT=8080
+   
+   # 安全配置（可选）
+   JWT_SECRET=please_change_this_to_a_random_secret_string
    ```
 
 3. **启动服务**
@@ -143,11 +142,14 @@ Gethub 2.0 正式发布！本次大版本更新带来了全新的 UI 风格、�
    # 格式: postgresql://USER:PASSWORD@HOST:PORT/DB_NAME?schema=public
    DATABASE_URL=postgresql://admin:password@192.168.1.100:5432/gethub?schema=public
    
-   # 其他配置
+   # 镜像拉取源
    GITHUB_REPOSITORY_OWNER=dick86114
+   
+   # 端口配置
+   PORT=8080
+   
+   # 安全配置（可选）
    JWT_SECRET=your_secure_secret
-   SERVER_PORT=3000
-   CLIENT_PORT=8080
    ```
 
 3. **启动服务**
