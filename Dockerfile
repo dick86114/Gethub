@@ -44,6 +44,6 @@ COPY --from=client-builder /app/client/dist ./public
 # Make start script executable
 RUN chmod +x start.sh
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["./start.sh"]

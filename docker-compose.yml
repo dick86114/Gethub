@@ -26,15 +26,14 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-gethub}:${DB_PASSWORD:-gethub_pass}@db:5432/${DB_NAME:-gethub}?schema=public
-      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_please_change_it}
-      - PORT=3000
+      - PORT=8080
     depends_on:
       db:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-8080}:8080"
 
 volumes:
   postgres_data:

@@ -9,9 +9,8 @@ services:
       # 请将下面的链接替换为你的远程数据库连接字符串
       # 格式: postgresql://USER:PASSWORD@HOST:PORT/DB_NAME?schema=public
       - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_please_change_it}
-      - PORT=3000
+      - PORT=8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-8080}:8080"
