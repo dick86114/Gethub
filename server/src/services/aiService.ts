@@ -71,9 +71,10 @@ export class AiService {
 
   static async analyzeContent(text: string): Promise<string> {
     const provider = await ConfigService.get('AI_PROVIDER');
-    const language = 'Chinese';
+    const language = 'Simplified Chinese (简体中文)';
 
-    const systemPrompt = `You are a senior technical expert. Analyze the following project documentation content and provide a comprehensive summary in ${language}. 
+    const systemPrompt = `You are a senior technical expert. Analyze the following project documentation content and provide a comprehensive summary STRICTLY in ${language}.
+    Regardless of the source language, the output MUST be in ${language}.
     Focus on:
     1. Core Functionality: What does it do?
     2. Key Features: What are the main capabilities?
