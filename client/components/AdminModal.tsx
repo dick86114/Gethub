@@ -8,7 +8,13 @@ interface AdminModalProps {
   onClose: () => void;
 }
 
-// ... existing code ...
+// Toast Types
+type ToastType = 'success' | 'error' | 'info';
+interface Toast {
+    id: string;
+    message: string;
+    type: ToastType;
+}
 
 const RepoDetailModal = ({ repo, onClose }: { repo: Repo; onClose: () => void }) => {
     return (
@@ -112,6 +118,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   // Login State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   
   // Config State
   const [configs, setConfigs] = useState<Partial<AppConfig>>({});
@@ -134,7 +141,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [testingGithub, setTestingGithub] = useState(false);
   const [testStatus, setTestStatus] = useState<{success?: boolean, message?: string, duration?: number} | null>(null);
   const [testGithubStatus, setTestGithubStatus] = useState<{success?: boolean, message?: string} | null>(null);
-  const [msg, setMsg] = useState('');
+  
+  // Toast State
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [manualRepo, setManualRepo] = useState('');
   const [manualLoading, setManualLoading] = useState(false);
@@ -152,6 +162,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   // Password Change State
   const [changePasswordOld, setChangePasswordOld] = useState('');
   const [changePasswordNew, setChangePasswordNew] = useState('');
+  const [changePasswordConfirm, setChangePasswordConfirm] = useState('');
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
 
   // New State for Detail View
@@ -160,6 +171,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
 
+  const showToast = (message: string, type: ToastType = 'info') => {
+      const id = Date.now().toString() + Math.random().toString();
+      setToasts(prev => [...prev, { id, message, type }]);
+      setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+      }, 3000);
+  };
+
   // New Handlers
   const handleView = async (repo: Repo) => {
       setLoadingDetail(true);
@@ -167,7 +186,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
           const detail = await getRepoDetail(token!, repo.id);
           setViewingRepo(detail);
       } catch (e) {
-          alert('获取详情失败');
+          showToast('获取详情失败', 'error');
       } finally {
           setLoadingDetail(false);
       }
@@ -182,10 +201,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
               setConfirmModal(prev => ({ ...prev, isOpen: false }));
               try {
                   await deleteRepo(token!, id);
-                  setMsg('删除成功');
+                  showToast('删除成功', 'success');
                   refreshRepos();
               } catch (e: any) {
-                  alert(`删除失败: ${e.message}`);
+                  showToast(`删除失败: ${e.message}`, 'error');
               }
           }
       });
@@ -204,11 +223,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                   for (const id of selectedRepoIds) {
                       await deleteRepo(token!, id);
                   }
-                  setMsg(`批量删除成功`);
+                  showToast(`批量删除成功`, 'success');
                   setSelectedRepoIds([]);
                   refreshRepos();
               } catch (e: any) {
-                  setMsg(`删除失败: ${e.message}`);
+                  showToast(`删除失败: ${e.message}`, 'error');
               } finally {
                   setLoading(false);
               }
@@ -234,10 +253,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const handleReAnalyze = async (id: number) => {
       try {
           await reAnalyzeRepo(token!, id);
-          setMsg('已触发重新分析');
+          showToast('已触发重新分析', 'success');
           refreshRepos();
       } catch (e: any) {
-          alert(`请求失败: ${e.message}`);
+          showToast(`请求失败: ${e.message}`, 'error');
       }
   };
 
@@ -252,10 +271,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
               setLoading(true);
               try {
                   const res = await cleanupRepos(token);
-                  setMsg(`清理完成，共删除 ${res.count} 个项目`);
+                  showToast(`清理完成，共删除 ${res.count} 个项目`, 'success');
                   refreshRepos();
               } catch (e: any) {
-                  setMsg(`清理失败: ${e.message}`);
+                  showToast(`清理失败: ${e.message}`, 'error');
               } finally {
                   setLoading(false);
               }
@@ -265,15 +284,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
   const handleChangePassword = async () => {
       if (!token || !changePasswordOld || !changePasswordNew) return;
+      
+      if (changePasswordNew !== changePasswordConfirm) {
+          showToast('两次输入的密码不一致', 'error');
+          return;
+      }
+
       setChangePasswordLoading(true);
       try {
           await changePassword(token, changePasswordOld, changePasswordNew);
-          setMsg('密码修改成功');
+          showToast('密码修改成功', 'success');
           setChangePasswordOld('');
           setChangePasswordNew('');
-          setTimeout(() => setMsg(''), 2000);
+          setChangePasswordConfirm('');
       } catch (e: any) {
-          setMsg(`修改失败: ${e.message}`);
+          showToast(`修改失败: ${e.message}`, 'error');
       } finally {
           setChangePasswordLoading(false);
       }
@@ -320,9 +345,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
       const res = await login(username, password);
       setToken(res.token);
       localStorage.setItem('admin_token', res.token);
-      setMsg('');
+      setLoginError('');
     } catch (e) {
-      setMsg('登录失败');
+      setLoginError('登录失败');
     } finally {
       setLoading(false);
     }
@@ -374,19 +399,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-        if (repoPage === 1) {
-            loadRepos();
-        } else {
-            setRepoPage(1);
-        }
+        loadRepos();
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
   const handleCopy = (text: string) => {
       navigator.clipboard.writeText(text);
-      setMsg('已复制到剪贴板');
-      setTimeout(() => setMsg(''), 2000);
+      showToast('已复制到剪贴板', 'success');
   };
 
   useEffect(() => {
@@ -400,11 +420,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
     setManualLoading(true);
     try {
         await addRepo(token, manualRepo);
-        setMsg('项目添加成功，后台正在进行 AI 分析...');
+        showToast('项目添加成功，后台正在进行 AI 分析...', 'success');
         setManualRepo('');
         refreshRepos();
     } catch (e: any) {
-        setMsg(`添加失败: ${e.message}`);
+        showToast(`添加失败: ${e.message}`, 'error');
     } finally {
         setManualLoading(false);
     }
@@ -415,10 +435,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       await updateConfigs(token, configs);
-      setMsg('配置已保存');
-      setTimeout(() => setMsg(''), 2000);
+      showToast('配置已保存', 'success');
     } catch (e) {
-      setMsg('保存失败');
+      showToast('保存失败', 'error');
     } finally {
       setLoading(false);
     }
@@ -468,10 +487,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
       if (!token) return;
       try {
           await triggerFetch(token);
-          setMsg('已触发后台拉取任务');
+          showToast('已触发后台拉取任务', 'success');
           startPolling();
       } catch(e) {
-          setMsg('触发失败');
+          showToast('触发失败', 'error');
       }
   };
 
@@ -577,10 +596,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                         ) : '立即登录'}
                     </button>
                     
-                    {msg && (
+                    {loginError && (
                         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 animate-[shake_0.5s]">
                             <span className="material-symbols-outlined text-red-400 text-sm">error</span>
-                            <p className="text-red-400 text-xs">{msg}</p>
+                            <p className="text-red-400 text-xs">{loginError}</p>
                         </div>
                     )}
                 </div>
@@ -788,34 +807,49 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                                 </div>
                              </div>
 
-                             <div className="pt-4 border-t border-white/5">
+                             <div className="pt-6 border-t border-white/5">
                                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">修改密码</h3>
-                                <div className="space-y-4">
+                                <div className="bg-black/20 rounded-xl border border-white/5 p-4 space-y-4">
                                     <div>
                                         <label className="block text-xs text-slate-500 mb-1">当前密码</label>
                                         <input
                                             type="password"
                                             value={changePasswordOld}
                                             onChange={e => setChangePasswordOld(e.target.value)}
-                                            className="w-full bg-black/20 border border-white/10 rounded p-2 text-white text-sm focus:border-primary outline-none"
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                                            placeholder="请输入当前密码"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs text-slate-500 mb-1">新密码</label>
-                                        <input
-                                            type="password"
-                                            value={changePasswordNew}
-                                            onChange={e => setChangePasswordNew(e.target.value)}
-                                            className="w-full bg-black/20 border border-white/10 rounded p-2 text-white text-sm focus:border-primary outline-none"
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs text-slate-500 mb-1">新密码</label>
+                                            <input
+                                                type="password"
+                                                value={changePasswordNew}
+                                                onChange={e => setChangePasswordNew(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                                                placeholder="请输入新密码"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-slate-500 mb-1">确认新密码</label>
+                                            <input
+                                                type="password"
+                                                value={changePasswordConfirm}
+                                                onChange={e => setChangePasswordConfirm(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-white text-sm focus:border-primary outline-none transition-colors"
+                                                placeholder="请再次输入新密码"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="flex justify-end">
+                                    <div className="flex justify-end pt-2">
                                         <button 
                                             onClick={handleChangePassword}
-                                            disabled={changePasswordLoading || !changePasswordOld || !changePasswordNew}
-                                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-slate-300 text-sm transition-colors disabled:opacity-50"
+                                            disabled={changePasswordLoading || !changePasswordOld || !changePasswordNew || !changePasswordConfirm}
+                                            className="px-4 py-2 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary rounded-lg text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                         >
-                                            {changePasswordLoading ? '修改中...' : '修改密码'}
+                                            {changePasswordLoading ? <span className="material-symbols-outlined text-sm animate-spin">sync</span> : <span className="material-symbols-outlined text-sm">lock_reset</span>}
+                                            {changePasswordLoading ? '修改中...' : '确认修改'}
                                         </button>
                                     </div>
                                 </div>
@@ -1046,12 +1080,54 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                         </div>
                     )}
                 </div>
-                
-                {msg && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 text-white text-sm rounded-lg backdrop-blur border border-white/10">{msg}</div>}
             </>
           )}
         </div>
       </div>
+
+      {/* Toast Notifications */}
+      <div className="fixed top-6 right-6 z-[110] flex flex-col gap-3 pointer-events-none">
+          <style>
+            {`
+              @keyframes slideInRight {
+                from { opacity: 0; transform: translateX(100%); }
+                to { opacity: 1; transform: translateX(0); }
+              }
+            `}
+          </style>
+          {toasts.map(toast => (
+              <div key={toast.id} style={{ animation: 'slideInRight 0.3s ease-out forwards' }} className={`pointer-events-auto w-80 p-4 rounded-xl shadow-2xl border backdrop-blur-xl flex items-start gap-3 transition-all duration-300 ${
+                  toast.type === 'success' ? 'bg-[#0e1015]/95 border-green-500/30 shadow-green-500/10' :
+                  toast.type === 'error' ? 'bg-[#0e1015]/95 border-red-500/30 shadow-red-500/10' :
+                  'bg-[#0e1015]/95 border-blue-500/30 shadow-blue-500/10'
+              }`}>
+                  <span className={`material-symbols-outlined text-xl mt-0.5 ${
+                      toast.type === 'success' ? 'text-green-400' :
+                      toast.type === 'error' ? 'text-red-400' :
+                      'text-blue-400'
+                  }`}>
+                      {toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : 'info'}
+                  </span>
+                  <div className="flex-1 overflow-hidden">
+                      <h4 className={`text-sm font-bold mb-1 ${
+                          toast.type === 'success' ? 'text-green-400' :
+                          toast.type === 'error' ? 'text-red-400' :
+                          'text-blue-400'
+                      }`}>
+                          {toast.type === 'success' ? '操作成功' : toast.type === 'error' ? '操作失败' : '提示'}
+                      </h4>
+                      <p className="text-xs text-slate-300 leading-relaxed break-words">{toast.message}</p>
+                  </div>
+                  <button 
+                      onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                      className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
+                  >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+              </div>
+          ))}
+      </div>
+
       {/* Readme Modal */}
       {viewingRepo && (
         <RepoDetailModal 

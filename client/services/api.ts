@@ -2,6 +2,22 @@ import { Repo, AppConfig } from '../types';
 
 const API_BASE = '/api';
 
+const handleResponse = async (res: Response, defaultError: string) => {
+  if (res.status === 401) {
+    throw new Error('401 Unauthorized');
+  }
+  if (!res.ok) {
+    try {
+      const data = await res.json();
+      throw new Error(data.error || defaultError);
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('401')) throw e;
+      throw new Error(defaultError);
+    }
+  }
+  return res.json();
+};
+
 export const getRandomRepo = async (): Promise<Repo | null> => {
   const res = await fetch(`${API_BASE}/repos/random`);
   if (!res.ok) return null;
@@ -27,18 +43,14 @@ export const changePassword = async (token: string, oldPassword: string, newPass
     },
     body: JSON.stringify({ oldPassword, newPassword })
   });
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || 'Failed to change password');
-  }
+  await handleResponse(res, 'Failed to change password');
 };
 
 export const getConfigs = async (token: string): Promise<AppConfig> => {
   const res = await fetch(`${API_BASE}/config`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  if (!res.ok) throw new Error('Failed to fetch config');
-  return res.json();
+  return handleResponse(res, 'Failed to fetch config');
 };
 
 export const updateConfigs = async (token: string, configs: Partial<AppConfig>): Promise<void> => {
@@ -50,6 +62,7 @@ export const updateConfigs = async (token: string, configs: Partial<AppConfig>):
     },
     body: JSON.stringify(configs)
   });
+  if (res.status === 401) throw new Error('401 Unauthorized');
   if (!res.ok) throw new Error('Failed to update config');
 };
 
@@ -58,16 +71,14 @@ export const triggerFetch = async (token: string) => {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Failed to trigger fetch');
-  return res.json();
+  return handleResponse(res, 'Failed to trigger fetch');
 };
 
 export const getJobStatus = async (token: string) => {
   const res = await fetch(`${API_BASE}/repos/job-status`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Failed to get status');
-  return res.json();
+  return handleResponse(res, 'Failed to get status');
 };
 
 export const getRepos = async (page = 1, limit = 10, search = '', sort = 'newest') => {
@@ -97,8 +108,7 @@ export const testAiConfig = async (token: string, config: any) => {
       openaiModel: config.OPENAI_MODEL
     })
   });
-  if (!res.ok) throw new Error('Failed to test AI config');
-  return res.json();
+  return handleResponse(res, 'Failed to test AI config');
 };
 
 export const testGithubConfig = async (token: string, proxyUrl: string, githubToken: string) => {
@@ -110,8 +120,7 @@ export const testGithubConfig = async (token: string, proxyUrl: string, githubTo
       },
       body: JSON.stringify({ proxyUrl, token: githubToken })
     });
-    if (!res.ok) throw new Error('Failed to test GitHub config');
-    return res.json();
+    return handleResponse(res, 'Failed to test GitHub config');
 };
 
 export const addRepo = async (token: string, repoName: string) => {
@@ -123,11 +132,7 @@ export const addRepo = async (token: string, repoName: string) => {
     },
     body: JSON.stringify({ repoName })
   });
-  if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to add repo');
-  }
-  return res.json();
+  return handleResponse(res, 'Failed to add repo');
 };
 
 export const cleanupRepos = async (token: string) => {
@@ -135,8 +140,7 @@ export const cleanupRepos = async (token: string) => {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Failed to cleanup repos');
-  return res.json();
+  return handleResponse(res, 'Failed to cleanup repos');
 };
 
 export const deleteRepo = async (token: string, id: number) => {
@@ -144,8 +148,7 @@ export const deleteRepo = async (token: string, id: number) => {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` }
   });
-  if (!res.ok) throw new Error('Failed to delete repo');
-  return res.json();
+  return handleResponse(res, 'Failed to delete repo');
 };
 
 export const reAnalyzeRepo = async (token: string, id: number) => {
@@ -153,16 +156,14 @@ export const reAnalyzeRepo = async (token: string, id: number) => {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` }
   });
-  if (!res.ok) throw new Error('Failed to re-analyze repo');
-  return res.json();
+  return handleResponse(res, 'Failed to re-analyze repo');
 };
 
 export const getRepoDetail = async (token: string, id: number) => {
   const res = await fetch(`${API_BASE}/repos/${id}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  if (!res.ok) throw new Error('Failed to fetch repo detail');
-  return res.json();
+  return handleResponse(res, 'Failed to fetch repo detail');
 };
 
 export const analyzeContent = async (text: string): Promise<string> => {
