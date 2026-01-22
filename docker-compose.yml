@@ -1,22 +1,46 @@
-version: '3'
+version: '3.8'
+
 services:
-  client:
-    build:
-      context: ./client
-    ports:
-      - "8080:80"
-    depends_on:
-      - server
-    restart: unless-stopped
+  db:
+    image: postgres:15-alpine
+    container_name: gethub-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-gethub}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gethub_pass}
+      POSTGRES_DB: ${DB_NAME:-gethub}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   server:
-    build:
-      context: ./server
-    ports:
-      - "3000:3000"
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-dick86114}/gethub-server:latest
+    container_name: gethub-server
+    restart: unless-stopped
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=postgresql://${DB_USER:-gethub}:${DB_PASSWORD:-gethub_pass}@db:5432/${DB_NAME:-gethub}?schema=public
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_please_change_it}
+      - PORT=3000
+    depends_on:
+      db:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+
+  client:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-dick86114}/gethub-client:latest
+    container_name: gethub-client
     restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-8080}:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:

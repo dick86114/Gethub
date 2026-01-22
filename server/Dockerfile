@@ -15,6 +15,9 @@ RUN npx prisma generate
 # Build TypeScript
 RUN npm run build
 
+COPY start.sh .
+RUN chmod +x start.sh
+
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push && npx prisma db seed && npm start"]
+CMD ["./start.sh"]
